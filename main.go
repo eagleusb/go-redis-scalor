@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,34 +12,13 @@ var ctx context.Context = context.Background()
 var timeout time.Duration = 30 * time.Second
 
 type RedisNode struct {
-	Slots []string
-	SlotsCount int
-	Id    string
-	Ip    string
-	Name  string
+	Slots           []string
+	SlotsCount      int
+	SlotsPercentage int
+	Id              string
+	Ip              string
+	Name            string
 }
-
-func checkErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func isRedisCli() (path string) {
-	path, err := exec.LookPath("redis-cli")
-	checkErr(err)
-	fmt.Println("Found redis-cli at", path)
-	return
-}
-
-func execRedisCli(args string) {
-	stdout, err := exec.Command(isRedisCli(), args).Output()
-	checkErr(err)
-	fmt.Printf("%v\n", string(stdout))
-}
-
-// TODO
-// func newNode() *RedisNode { return }
 
 func init() { fmt.Print("Hello World\n") }
 
@@ -85,11 +63,13 @@ func main() {
 
 		if _, ok := clusterNodes[_nodeId]; ok {
 			clusterNode.Slots = append(clusterNodes[_nodeId].Slots, fmt.Sprint(slot.Start, "-", slot.End))
-			clusterNode.SlotsCount = clusterNodes[_nodeId].SlotsCount + ((slot.End + 1) - slot.Start)
+			clusterNode.SlotsCount = clusterNodes[_nodeId].SlotsCount + slotsCount(slot.Start, slot.End)
+			clusterNode.SlotsPercentage = clusterNodes[_nodeId].SlotsPercentage + slotsPercentage(slotsCount(slot.Start, slot.End))
 		} else {
-			clusterNode.Slots =	make([]string, 1)
+			clusterNode.Slots = make([]string, 1)
 			clusterNode.Slots[0] = fmt.Sprint(slot.Start, "-", slot.End)
-			clusterNode.SlotsCount = (slot.End + 1) - slot.Start
+			clusterNode.SlotsCount = slotsCount(slot.Start, slot.End)
+			clusterNode.SlotsPercentage = slotsPercentage(clusterNode.SlotsCount)
 		}
 
 		clusterNodes[_nodeId] = *clusterNode
@@ -97,11 +77,12 @@ func main() {
 
 	for _, node := range clusterNodes {
 		fmt.Printf(
-			"ID: %s slots: %s slotsEntries: %d slotsCount: %d IP: %s\n",
+			"ID: %s slots: %s slotsEntries: %d slotsCount: %d slotsPercentage: %d IP: %s\n",
 			node.Id,
 			node.Slots,
 			len(node.Slots),
 			node.SlotsCount,
+			node.SlotsPercentage,
 			node.Ip,
 		)
 	}
