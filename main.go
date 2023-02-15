@@ -14,6 +14,7 @@ var timeout time.Duration = 30 * time.Second
 
 type RedisNode struct {
 	Slots []string
+	SlotsCount int
 	Id    string
 	Ip    string
 	Name  string
@@ -84,19 +85,23 @@ func main() {
 
 		if _, ok := clusterNodes[_nodeId]; ok {
 			clusterNode.Slots = append(clusterNodes[_nodeId].Slots, fmt.Sprint(slot.Start, "-", slot.End))
+			clusterNode.SlotsCount = clusterNodes[_nodeId].SlotsCount + ((slot.End + 1) - slot.Start)
 		} else {
 			clusterNode.Slots =	make([]string, 1)
 			clusterNode.Slots[0] = fmt.Sprint(slot.Start, "-", slot.End)
+			clusterNode.SlotsCount = (slot.End + 1) - slot.Start
 		}
+
 		clusterNodes[_nodeId] = *clusterNode
 	}
 
 	for _, node := range clusterNodes {
 		fmt.Printf(
-			"ID: %s slots: %s slotsEntries: %d IP: %s\n",
+			"ID: %s slots: %s slotsEntries: %d slotsCount: %d IP: %s\n",
 			node.Id,
 			node.Slots,
 			len(node.Slots),
+			node.SlotsCount,
 			node.Ip,
 		)
 	}
