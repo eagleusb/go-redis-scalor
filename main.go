@@ -77,21 +77,27 @@ func main() {
 		_nodeId := clusterSlots[i].Nodes[0].ID
 		_nodeIp := clusterSlots[i].Nodes[0].Addr
 
-		node := &RedisNode{
+		clusterNode := &RedisNode{
 			Id: _nodeId,
 			Ip: _nodeIp,
 		}
-		node.Slots = make([]string, 3)
-		node.Slots[0] = fmt.Sprint(slot.Start, "-", slot.End)
 
-		clusterNodes[_nodeId] = *node
+		if _, ok := clusterNodes[_nodeId]; ok {
+			clusterNode.Slots = append(clusterNodes[_nodeId].Slots, fmt.Sprint(slot.Start, "-", slot.End))
+		} else {
+			clusterNode.Slots =	make([]string, 1)
+			clusterNode.Slots[0] = fmt.Sprint(slot.Start, "-", slot.End)
+		}
+		clusterNodes[_nodeId] = *clusterNode
+	}
 
+	for _, node := range clusterNodes {
 		fmt.Printf(
-			"redis-%v slots: %v ID: %s IP: %s\n",
-			i,
-			clusterNodes[_nodeId].Slots[0],
-			clusterNodes[_nodeId].Id,
-			clusterNodes[_nodeId].Ip,
+			"ID: %s slots: %s slotsEntries: %d IP: %s\n",
+			node.Id,
+			node.Slots,
+			len(node.Slots),
+			node.Ip,
 		)
 	}
 
