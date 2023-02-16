@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -20,11 +21,20 @@ type RedisNode struct {
 	Name            string
 }
 
+type RedisClusterConf struct {
+	Conf          map[string]string
+	State         string
+	Size          string
+	SlotsAssigned string
+	SlotsOk       string
+	NodesKnown    string
+}
+
 func init() { fmt.Print("Hello World\n") }
 
 func main() {
 
-	var clientOpts = &redis.Options{
+	clientOpts := &redis.Options{
 		Addr:        ":6379",
 		ClientName:  "go-redis-scalor",
 		DialTimeout: timeout,
@@ -49,6 +59,7 @@ func main() {
 		clusterNodesList,
 	)
 
+	// TODO: gather slots distribution per shard
 	clusterSlots, _ := client.ClusterSlots(ctx).Result()
 	clusterNodes := make(map[string]RedisNode)
 
@@ -87,12 +98,27 @@ func main() {
 		)
 	}
 
+	// TODO: cluster config / state serialization
+	clusterConf := &RedisClusterConf{
+		Conf: make(map[string]string),
+	}
+
+	for _, v := range strings.Split(clusterInfo, "\n") {
+		_args := strings.Split(v, ":")
+		if len(_args) >= 2 {
+			clusterConf.Conf[_args[0]] = _args[1]
+
+			if clusterConf.wantedRedisConfArg(_args[0]) {
+				clusterConf.setRedisConfArg(_args)
+			}
+		}
+	}
+
 	/*
-		TODO: implement live resharding through API
+		TODO: live resharding
+		implement live resharding through API
 		see https://redis.io/commands/cluster-setslot/
 	*/
-	// v, err := client.Do(ctx, "cluster", "setslot"...).Text()
-	// fmt.Printf("%q %s", v, err)
-
 	execRedisCli("--version")
+
 }
