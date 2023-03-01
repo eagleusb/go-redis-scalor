@@ -1,51 +1,18 @@
-package main
+package rediscluster
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 
 	"github.com/redis/go-redis/v9"
 )
-
-func checkErr(err error) {
-	if err != nil {
-		fmt.Printf("Error: %s", err)
-		panic(err)
-	}
-}
-
-// TODO
-// func newNode() *RedisNode { return }
-
-func slotsCount(slotStart, slotEnd int) int {
-	return ((slotEnd + 1) - slotStart)
-}
-
-func slotsPercentage(slots int) int {
-	return int((float64(slots) / float64(16384)) * float64(100))
-}
-
-func isRedisCli() (path string) {
-	path, err := exec.LookPath("redis-cli")
-	checkErr(err)
-	fmt.Println("Found redis-cli at", path)
-	return
-}
-
-func execRedisCli(args []string) string {
-	cmd := exec.Command(isRedisCli(), args...)
-	fmt.Println("Execution of command:", cmd)
-	stdout, err := cmd.Output()
-	checkErr(err)
-	return string(stdout)
-}
 
 func rebalanceRedisShard(master string, slots int, fromId string, toId string) {
 	cmd := []string{"--cluster", "reshard", master, "--cluster-from", fromId, "--cluster-to", toId, "--cluster-slots", "100", "--cluster-yes"}
 	execRedisCli(cmd)
 }
 
-func (c *RedisClusterConf) wantedRedisConfArg(lookup string) bool {
+func (c *RedisClusterConf) WantedRedisConfArg(lookup string) bool {
 	switch lookup {
 	case
 		"cluster_state",
@@ -58,7 +25,7 @@ func (c *RedisClusterConf) wantedRedisConfArg(lookup string) bool {
 	return false
 }
 
-func (c *RedisClusterConf) setRedisConfArg(arg []string) {
+func (c *RedisClusterConf) SetRedisConfArg(arg []string) {
 	switch arg[0] {
 	case "cluster_state":
 		c.State = arg[1]
@@ -73,7 +40,7 @@ func (c *RedisClusterConf) setRedisConfArg(arg []string) {
 	}
 }
 
-func (c *RedisClusterConf) getRedisConfArg(arg string) (_value string) {
+func (c *RedisClusterConf) GetRedisConfArg(arg string) (_value string) {
 	switch arg {
 	case "cluster_state":
 		_value = c.State
@@ -89,7 +56,7 @@ func (c *RedisClusterConf) getRedisConfArg(arg string) (_value string) {
 	return
 }
 
-func (r *RedisNodes) setRedisClusterNodes(client *redis.Client) {
+func (r *RedisNodes) SetRedisClusterNodes(client *redis.Client, ctx context.Context) {
 	clusterSlots, _ := client.ClusterSlots(ctx).Result()
 
 	for i, slot := range clusterSlots {
@@ -116,7 +83,7 @@ func (r *RedisNodes) setRedisClusterNodes(client *redis.Client) {
 	}
 }
 
-func (r *RedisNodes) getRedisClusterNodes(client *redis.Client) {
+func (r *RedisNodes) GetRedisClusterNodes(client *redis.Client) {
 		for _, node := range r.ClusterNodes {
 		fmt.Printf(
 			"ID: %s slots: %s slotsRanges: %d slotsCount: %d slotsPercentage: %d IP: %s\n",
