@@ -3,10 +3,13 @@ package main
 import (
 	"fmt"
 	"os/exec"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func checkErr(err error) {
 	if err != nil {
+		fmt.Printf("Error: %s", err)
 		panic(err)
 	}
 }
@@ -29,16 +32,18 @@ func isRedisCli() (path string) {
 	return
 }
 
-func execRedisCli(args string) {
-	stdout, err := exec.Command(isRedisCli(), args).Output()
+func execRedisCli(args []string) string {
+	cmd := exec.Command(isRedisCli(), args...)
+	fmt.Println("Execution of command:", cmd)
+	stdout, err := cmd.Output()
 	checkErr(err)
-	fmt.Printf("%v\n", string(stdout))
+	return string(stdout)
 }
 
-// TODO
-// func rebalanceRedis()  {
-// redis-cli --cluster reshard <host>:<port> --cluster-from <node-id> --cluster-to <node-id> --cluster-slots <number of slots> --cluster-yes
-// }
+func rebalanceRedisShard(master string, slots int, fromId string, toId string) {
+	cmd := []string{"--cluster", "reshard", master, "--cluster-from", fromId, "--cluster-to", toId, "--cluster-slots", "100", "--cluster-yes"}
+	execRedisCli(cmd)
+}
 
 func (c *RedisClusterConf) wantedRedisConfArg(lookup string) bool {
 	switch lookup {
@@ -56,31 +61,71 @@ func (c *RedisClusterConf) wantedRedisConfArg(lookup string) bool {
 func (c *RedisClusterConf) setRedisConfArg(arg []string) {
 	switch arg[0] {
 	case "cluster_state":
-			c.State = arg[1]
+		c.State = arg[1]
 	case "cluster_slots_assigned":
-			c.SlotsAssigned = arg[1]
+		c.SlotsAssigned = arg[1]
 	case "cluster_slots_ok":
-			c.SlotsOk = arg[1]
+		c.SlotsOk = arg[1]
 	case "cluster_known_nodes":
-			c.NodesKnown = arg[1]
+		c.NodesKnown = arg[1]
 	case "cluster_size":
-			c.Size = arg[1]
+		c.Size = arg[1]
 	}
 }
 
 func (c *RedisClusterConf) getRedisConfArg(arg string) (_value string) {
-	// _value = ""
 	switch arg {
 	case "cluster_state":
-			_value = c.State
+		_value = c.State
 	case "cluster_slots_assigned":
-			_value = c.SlotsAssigned
+		_value = c.SlotsAssigned
 	case "cluster_slots_ok":
-			_value = c.SlotsOk
+		_value = c.SlotsOk
 	case "cluster_known_nodes":
-			_value = c.NodesKnown
+		_value = c.NodesKnown
 	case "cluster_size":
-			_value = c.Size
+		_value = c.Size
 	}
 	return
+}
+
+func (r *RedisNodes) setRedisClusterNodes(client *redis.Client) {
+	clusterSlots, _ := client.ClusterSlots(ctx).Result()
+
+	for i, slot := range clusterSlots {
+		_nodeId := clusterSlots[i].Nodes[0].ID
+		_nodeIp := clusterSlots[i].Nodes[0].Addr
+
+		clusterNode := &RedisNode{
+			Id: _nodeId,
+			Ip: _nodeIp,
+		}
+
+		if _, ok := r.ClusterNodes[_nodeId]; ok {
+			clusterNode.Slots = append(r.ClusterNodes[_nodeId].Slots, fmt.Sprint(slot.Start, "-", slot.End))
+			clusterNode.SlotsCount = r.ClusterNodes[_nodeId].SlotsCount + slotsCount(slot.Start, slot.End)
+			clusterNode.SlotsPercentage = r.ClusterNodes[_nodeId].SlotsPercentage + slotsPercentage(slotsCount(slot.Start, slot.End))
+		} else {
+			clusterNode.Slots = make([]string, 1)
+			clusterNode.Slots[0] = fmt.Sprint(slot.Start, "-", slot.End)
+			clusterNode.SlotsCount = slotsCount(slot.Start, slot.End)
+			clusterNode.SlotsPercentage = slotsPercentage(clusterNode.SlotsCount)
+		}
+
+		r.ClusterNodes[_nodeId] = *clusterNode
+	}
+}
+
+func (r *RedisNodes) getRedisClusterNodes(client *redis.Client) {
+		for _, node := range r.ClusterNodes {
+		fmt.Printf(
+			"ID: %s slots: %s slotsRanges: %d slotsCount: %d slotsPercentage: %d IP: %s\n",
+			node.Id,
+			node.Slots,
+			len(node.Slots),
+			node.SlotsCount,
+			node.SlotsPercentage,
+			node.Ip,
+		)
+	}
 }
