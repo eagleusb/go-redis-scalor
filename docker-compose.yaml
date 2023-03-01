@@ -1,0 +1,74 @@
+---
+services:
+  redis-0:
+    image: bitnami/redis-cluster:7.0
+    container_name: "redis-0"
+    environment:
+      - "ALLOW_EMPTY_PASSWORD=yes"
+      - "REDIS_CLUSTER_REPLICAS=0"
+      - "REDIS_NODES=redis-0 redis-1 redis-2"
+      - "REDIS_CLUSTER_CREATOR=yes"
+    ports:
+      - "32000:6379"
+    configs:
+      - source: redis
+        target: /opt/bitnami/redis/mounted-etc/overrides.conf
+        mode: 0444
+    networks:
+      redis-cluster:
+        ipv4_address: "172.21.1.10"
+  redis-1:
+    # extends: NOTE: precedence is a total pain, port: [] is not override
+    #   service: redis-0
+    image: bitnami/redis-cluster:7.0
+    container_name: "redis-1"
+    environment:
+      - "ALLOW_EMPTY_PASSWORD=yes"
+      - "REDIS_CLUSTER_REPLICAS=0"
+      - "REDIS_NODES=redis-0 redis-1 redis-2"
+      - "REDIS_CLUSTER_CREATOR=no"
+    ports:
+      - "32001:6379"
+    configs:
+      - source: redis
+        target: /opt/bitnami/redis/mounted-etc/overrides.conf
+        mode: 0444
+    networks:
+      redis-cluster:
+        ipv4_address: "172.21.1.20"
+  redis-2:
+    image: bitnami/redis-cluster:7.0
+    container_name: "redis-2"
+    environment:
+      - "ALLOW_EMPTY_PASSWORD=yes"
+      - "REDIS_CLUSTER_REPLICAS=0"
+      - "REDIS_NODES=redis-0 redis-1 redis-2"
+      - "REDIS_CLUSTER_CREATOR=no"
+    ports:
+      - "32002:6379"
+    configs:
+      - source: redis
+        target: /opt/bitnami/redis/mounted-etc/overrides.conf
+        mode: 0444
+    networks:
+      redis-cluster:
+        ipv4_address: "172.21.1.30"
+    # volumes:
+    #   - /test/redis.conf:/opt/bitnami/redis/mounted-etc/overrides.conf
+
+# volumes:
+#   config:
+#     - /test/redis.conf:/opt/bitnami/redis/mounted-etc/overrides.conf
+
+configs:
+  redis:
+    file: "./test/redis.conf"
+
+secrets: {}
+
+networks:
+  redis-cluster:
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.21.1.0/24"
